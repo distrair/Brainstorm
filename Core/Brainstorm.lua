@@ -19,13 +19,19 @@ Brainstorm.config = {
   ar_filters = {
     pack = {},
     pack_id = 1,
+    voucher_name = "",
+    voucher_id = 1,
     tag_name = "tag_charm",
     tag_id = 2,
     soul_skip = 1,
+    inst_observatory = false,
+    inst_perkeo = false,
   },
   ar_prefs = {
     spf_id = 3,
     spf_int = 1000,
+    faceCount = 25,
+    suitRatio = 5,
   },
 }
 
@@ -97,6 +103,102 @@ function Controller:key_press_update(key, dt)
   end
 end
 
+function analyze_deck()
+  local deck_summary = {}
+  local suit_count = {Hearts = 0, Diamonds = 0, Clubs = 0, Spades = 0}
+  local face_card_count = 0
+  local numeric_card_count = 0
+  local ace_count = 0
+  local unique_card_count = 0
+
+  for _, card in ipairs(G.playing_cards) do
+      if card.base then
+          local card_name = card.base.value .. " of " .. card.base.suit
+          deck_summary[card_name] = (deck_summary[card_name] or 0) + 1
+          suit_count[card.base.suit] = (suit_count[card.base.suit] or 0) + 1
+
+          -- Categorizing cards
+          if card.base.value == "Ace" then
+              ace_count = ace_count + 1
+          elseif card.base.value == "Jack" or card.base.value == "Queen" or card.base.value == "King" then
+              face_card_count = face_card_count + 1
+          else
+              numeric_card_count = numeric_card_count + 1
+          end
+      end
+  end
+
+  -- Count unique cards
+  for _ in pairs(deck_summary) do
+      unique_card_count = unique_card_count + 1
+  end
+
+  -- Return the analysis result
+  return {
+      deck_summary = deck_summary,
+      suit_count = suit_count,
+      face_card_count = face_card_count,
+      numeric_card_count = numeric_card_count,
+      ace_count = ace_count,
+      unique_card_count = unique_card_count
+  }
+end
+
+function print_deck_summary(deck_data)
+  print("----- Deck Breakdown -----")
+  print(string.format("Total Unique Cards: %d", deck_data.unique_card_count))
+  print(string.format("Face Cards (J, Q, K): %d", deck_data.face_card_count))
+  print(string.format("Numeric Cards (2-10): %d", deck_data.numeric_card_count))
+  print(string.format("Aces: %d", deck_data.ace_count))
+
+  print("\nSuit Distribution:")
+  for suit, count in pairs(deck_data.suit_count) do
+      print(string.format("%s: %d", suit, count))
+  end
+
+  print("\nCard Breakdown:")
+  for card_name, count in pairs(deck_data.deck_summary) do
+      print(string.format("%s: %d", card_name, count))
+  end
+end
+
+function is_valid_deck(deck_data, min_face_cards, min_aces, dominant_suit_ratio)
+  -- Extract counts from the deck analysis
+  local total_cards = #G.playing_cards
+  local face_card_count = deck_data.face_card_count
+  local ace_count = deck_data.ace_count
+  local suit_count = deck_data.suit_count
+
+  -- Check Face Cards & Aces
+  if face_card_count < min_face_cards then
+      print("Not enough face cards:", face_card_count, "Required:", min_face_cards)
+      return false
+  end
+  if ace_count < min_aces then
+      print("Not enough aces:", ace_count, "Required:", min_aces)
+      return false
+  end
+
+  -- Check suit distribution
+  local sorted_suits = {}
+  for suit, count in pairs(suit_count) do
+      table.insert(sorted_suits, {suit = suit, count = count})
+  end
+  table.sort(sorted_suits, function(a, b) return a.count > b.count end)
+
+  -- Sum the top 2 suit counts
+  local top_2_suit_count = sorted_suits[1].count + (sorted_suits[2] and sorted_suits[2].count or 0)
+  local top_2_suit_percentage = top_2_suit_count / total_cards
+
+  if top_2_suit_percentage < dominant_suit_ratio then
+      print("Suit distribution is too spread out.")
+      return false
+  end
+
+  print("Deck meets all conditions!")
+  return true
+end
+
 function Brainstorm.reroll()
   local G = G -- Cache global G for performance
   G.GAME.viewed_back = nil
@@ -105,9 +207,11 @@ function Brainstorm.reroll()
   G.forced_seed = G.GAME.seeded and G.GAME.pseudorandom.seed or nil
 
   local seed = G.run_setup_seed and G.setup_seed or G.forced_seed
-  local stake = not G.challenge_tab
-      and (G.GAME.stake or G.PROFILES[G.SETTINGS.profile].MEMORY.stake or 1)
+  local stake = (
+    G.GAME.stake
+    or G.PROFILES[G.SETTINGS.profile].MEMORY.stake
     or 1
+  ) or 1
 
   G:delete_run()
   G:start_run({ stake = stake, seed = seed, challenge = G.challenge_tab })
@@ -123,17 +227,26 @@ function Game:update(dt)
 
     if Brainstorm.ar_timer >= Brainstorm.AR_INTERVAL then
       Brainstorm.ar_timer = Brainstorm.ar_timer - Brainstorm.AR_INTERVAL
-      if Brainstorm.autoReroll() then
-        Brainstorm.ar_active = false
-        Brainstorm.ar_frames = 0
-        if Brainstorm.ar_text then
-          Brainstorm.removeAttentionText(Brainstorm.ar_text)
-          Brainstorm.ar_text = nil
+      local seed_found = Brainstorm.autoReroll()
+      if seed_found then
+        local deck_data = analyze_deck()        
+        if is_valid_deck(deck_data, Brainstorm.config.ar_prefs.faceCount, 0, 0.5) then
+          print("Deck is good!")
+          Brainstorm.ar_active = false -- STOP REROLLING
+          Brainstorm.ar_frames = 0
+          if Brainstorm.ar_text then
+            Brainstorm.removeAttentionText(Brainstorm.ar_text)
+            Brainstorm.ar_text = nil
+          end
+        else
+          print("Deck did not meet criteria, retrying...")
+          --Brainstorm.AUTOREROLL.waitingForNextReroll = true -- Prevent instant reroll
         end
       end
     end
-
+    print(Brainstorm.ar_frames)
     if Brainstorm.ar_frames == 60 and not Brainstorm.ar_text then
+      print(Brainstorm.ar_frames)
       Brainstorm.ar_text = Brainstorm.attentionText({
         scale = 1.4,
         text = "Rerolling...",
@@ -155,7 +268,7 @@ function Brainstorm.autoReroll()
   local ffi = require("ffi")
   local lovely = require("lovely")
   ffi.cdef([[
-	const char* brainstorm(const char* seed, const char* pack, const char* tag, double souls);
+	const char* brainstorm(const char* seed, const char* voucher, const char* pack, const char* tag, double souls, bool observatory, bool perkeo);
     ]])
   local immolate = ffi.load(Brainstorm.PATH .. "/Immolate.dll")
   local pack
@@ -170,12 +283,21 @@ function Brainstorm.autoReroll()
     set = "Tag",
     key = Brainstorm.config.ar_filters.tag_name,
   })
+  local voucher_name = localize({
+    type = "name_text",
+    set = "Voucher",
+    key = Brainstorm.config.ar_filters.voucher_name,
+  })
+  print(pack_name, tag_name, voucher_name)
   seed_found = ffi.string(
     immolate.brainstorm(
       seed_found,
+      voucher_name,
       pack_name,
       tag_name,
-      Brainstorm.config.ar_filters.soul_skip
+      Brainstorm.config.ar_filters.soul_skip,
+      Brainstorm.config.ar_filters.inst_observatory,
+      Brainstorm.config.ar_filters.inst_perkeo
     )
   )
   if seed_found then
@@ -186,9 +308,31 @@ function Brainstorm.autoReroll()
       seed = seed_found,
       challenge = G.GAME and G.GAME.challenge and G.GAME.challenge_tab,
     })
+    G.GAME.used_filter = true
+    G.GAME.filter_info = {
+      filter_params = {
+        seed_found,
+        voucher_name,
+        pack_name,
+        tag_name,
+        Brainstorm.config.ar_filters.soul_skip,
+        Brainstorm.config.ar_filters.inst_observatory,
+        Brainstorm.config.ar_filters.inst_perkeo,
+      },
+    }
     G.GAME.seeded = false
   end
   return seed_found
+end
+
+local cursr = create_UIBox_round_scores_row
+function create_UIBox_round_scores_row(score, text_colour)
+  local ret = cursr(score, text_colour)
+  ret.nodes[2].nodes[1].config.colour = (score == "seed" and G.GAME.seeded)
+      and G.C.RED
+    or (score == "seed" and G.GAME.used_filter) and G.C.BLUE
+    or G.C.BLACK
+  return ret
 end
 
 -- TODO: Rework attention text.
