@@ -30,8 +30,8 @@ Brainstorm.config = {
   ar_prefs = {
     spf_id = 3,
     spf_int = 1000,
-    faceCount = 25,
-    suitRatio = 5,
+    face_count = 0,
+    suut_ratio_percent = "50%",
   },
 }
 
@@ -163,19 +163,24 @@ function print_deck_summary(deck_data)
 end
 
 function is_valid_deck(deck_data, min_face_cards, min_aces, dominant_suit_ratio)
+  -- Ensure parameters are not nil by providing default values
+  min_face_cards = min_face_cards or 0
+  min_aces = min_aces or 0
+  dominant_suit_ratio = dominant_suit_ratio or 0
+
   -- Extract counts from the deck analysis
   local total_cards = #G.playing_cards
-  local face_card_count = deck_data.face_card_count
-  local ace_count = deck_data.ace_count
-  local suit_count = deck_data.suit_count
+  local face_card_count = deck_data.face_card_count or 0
+  local ace_count = deck_data.ace_count or 0
+  local suit_count = deck_data.suit_count or 0
 
   -- Check Face Cards & Aces
   if face_card_count < min_face_cards then
-      print("Not enough face cards:", face_card_count, "Required:", min_face_cards)
+      --print("Not enough face cards:", face_card_count, "Required:", min_face_cards)
       return false
   end
   if ace_count < min_aces then
-      print("Not enough aces:", ace_count, "Required:", min_aces)
+      --print("Not enough aces:", ace_count, "Required:", min_aces)
       return false
   end
 
@@ -191,11 +196,10 @@ function is_valid_deck(deck_data, min_face_cards, min_aces, dominant_suit_ratio)
   local top_2_suit_percentage = top_2_suit_count / total_cards
 
   if top_2_suit_percentage < dominant_suit_ratio then
-      print("Suit distribution is too spread out.")
+      --print("Suit distribution is too spread out.")
       return false
   end
 
-  print("Deck meets all conditions!")
   return true
 end
 
@@ -229,24 +233,27 @@ function Game:update(dt)
       Brainstorm.ar_timer = Brainstorm.ar_timer - Brainstorm.AR_INTERVAL
       local seed_found = Brainstorm.autoReroll()
       if seed_found then
-        local deck_data = analyze_deck()        
-        if is_valid_deck(deck_data, Brainstorm.config.ar_prefs.faceCount, 0, 0.5) then
-          print("Deck is good!")
-          Brainstorm.ar_active = false -- STOP REROLLING
-          Brainstorm.ar_frames = 0
-          if Brainstorm.ar_text then
-            Brainstorm.removeAttentionText(Brainstorm.ar_text)
-            Brainstorm.ar_text = nil
+        if G.GAME.starting_params.erratic_suits_and_ranks then
+          local deck_data = analyze_deck()        
+          if is_valid_deck(deck_data, Brainstorm.config.ar_prefs.face_count, 0, Brainstorm.config.ar_prefs.suit_ratio_decimal) then
+            Brainstorm.ar_active = false -- STOP REROLLING
+            Brainstorm.ar_frames = 0
+            if Brainstorm.ar_text then
+              Brainstorm.removeAttentionText(Brainstorm.ar_text)
+              Brainstorm.ar_text = nil
+            end
           end
         else
-          print("Deck did not meet criteria, retrying...")
-          --Brainstorm.AUTOREROLL.waitingForNextReroll = true -- Prevent instant reroll
+          Brainstorm.ar_active = false -- STOP REROLLING
+            Brainstorm.ar_frames = 0
+            if Brainstorm.ar_text then
+              Brainstorm.removeAttentionText(Brainstorm.ar_text)
+              Brainstorm.ar_text = nil
+            end
         end
       end
     end
-    print(Brainstorm.ar_frames)
     if Brainstorm.ar_frames == 60 and not Brainstorm.ar_text then
-      print(Brainstorm.ar_frames)
       Brainstorm.ar_text = Brainstorm.attentionText({
         scale = 1.4,
         text = "Rerolling...",
@@ -258,6 +265,12 @@ function Game:update(dt)
   end
 end
 
+local ffi = require("ffi")
+local lovely = require("lovely")
+ffi.cdef([[
+const char* brainstorm(const char* seed, const char* voucher, const char* pack, const char* tag, double souls, bool observatory, bool perkeo);
+  ]])
+
 function Brainstorm.autoReroll()
   local seed_found = random_string(
     8,
@@ -265,11 +278,7 @@ function Brainstorm.autoReroll()
       + G.CONTROLLER.cursor_hover.T.y * 0.874146
       + 0.412311010 * G.CONTROLLER.cursor_hover.time
   )
-  local ffi = require("ffi")
-  local lovely = require("lovely")
-  ffi.cdef([[
-	const char* brainstorm(const char* seed, const char* voucher, const char* pack, const char* tag, double souls, bool observatory, bool perkeo);
-    ]])
+
   local immolate = ffi.load(Brainstorm.PATH .. "/Immolate.dll")
   local pack
   if #Brainstorm.config.ar_filters.pack > 0 then
@@ -288,7 +297,7 @@ function Brainstorm.autoReroll()
     set = "Voucher",
     key = Brainstorm.config.ar_filters.voucher_name,
   })
-  print(pack_name, tag_name, voucher_name)
+  --print(pack_name, tag_name, voucher_name)
   seed_found = ffi.string(
     immolate.brainstorm(
       seed_found,

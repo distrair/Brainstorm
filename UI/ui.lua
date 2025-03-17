@@ -81,6 +81,16 @@ local spf_list = {
 
 local spf_keys = { "500", "750", "1000" }
 
+local ratio_list = {
+  ["50%"] = 0.5,
+  ["60%"] = 0.6,
+  ["70%"] = 0.7,
+  ["75%"] = 0.75,
+  ["80%"] = 0.80,
+}
+
+local ratio_keys = { "50%", "60%", "70%", "75%", "80%" }
+
 local voucher_keys = {
   "None",
   "Overstock",
@@ -168,12 +178,13 @@ G.FUNCS.change_spf = function(x)
 end
 
 G.FUNCS.change_face_count = function(x)
-	Brainstorm.config.ar_prefs.faceCount = x.to_val
+	Brainstorm.config.ar_prefs.face_count = x.to_val
 	Brainstorm.writeConfig()
 end
 
 G.FUNCS.change_suit_ratio = function(x)
-	Brainstorm.config.ar_prefs.suitRatio = x.to_val
+	Brainstorm.config.ar_prefs.suit_ratio_percent = x.to_key
+  Brainstorm.config.ar_prefs.suit_ratio_decimal = ratio_list[x.to_val]
 	Brainstorm.writeConfig()
 end
 
@@ -272,20 +283,20 @@ function create_tabs(args)
                   callback = function(_set_toggle) end,
                 }),
                 create_option_cycle({
-                  label = "Erratic Deck: Number of Face Cards",
+                  label = "ED: Min. # of Face Cards",
                   scale = 0.8,
                   w = 4,
                   options = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25},
                   opt_callback = "change_face_count",
-                  current_option = Brainstorm.config.ar_prefs.faceCount + 1 or 1,
+                  current_option = Brainstorm.config.ar_prefs.face_count + 1 or 1,
                 }),
                 create_option_cycle({
-                  label = "Erratic Deck: 2 suit ratio",
+                  label = "ED: Suit Ratio ",
                   scale = 0.8,
                   w = 4,
-                  options = {0,1,2,3,4,5,6,7,8},
+                  options = ratio_keys,
                   opt_callback = "change_suit_ratio",
-                  current_option = Brainstorm.config.ar_prefs.suitRatio + 1 or 1,
+                  current_option = Brainstorm.config.ar_prefs.suit_ratio_percent,
                 }),
               },
             },
