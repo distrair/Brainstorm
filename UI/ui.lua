@@ -20,6 +20,26 @@ local tag_list = {
   ["D6 Tag"] = "tag_d_six",
 }
 
+local voucher_list = {
+  ["None"] = "",
+  ["Overstock"] = "v_overstock_norm",
+  ["Clearance Sale"] = "v_clearance_sale",
+  ["Hone"] = "v_hone",
+  ["Reroll Surplus"] = "v_reroll_surplus",
+  ["Crystal Ball"] = "v_crystal_ball",
+  ["Telescope"] = "v_telescope",
+  ["Grabber"] = "v_grabber",
+  ["Wasteful"] = "v_wasteful",
+  ["Tarot Merchant"] = "v_tarot_merchant",
+  ["Planet Merchant"] = "v_planet_merchant",
+  ["Seed Money"] = "v_seed_money",
+  ["Blank"] = "v_blank",
+  ["Magic Trick"] = "v_magic_trick",
+  ["Hieroglyph"] = "v_hieroglyph",
+  ["Director's Cut"] = "v_directors_cut",
+  ["Paint Brush"] = "v_paint_brush",
+}
+
 local pack_list = {
   ["None"] = {},
   ["Normal Arcana"] = {
@@ -61,6 +81,36 @@ local spf_list = {
 
 local spf_keys = { "500", "750", "1000" }
 
+local ratio_list = {
+  ["50%"] = 0.5,
+  ["60%"] = 0.6,
+  ["70%"] = 0.7,
+  ["75%"] = 0.75,
+  ["80%"] = 0.80,
+}
+
+local ratio_keys = { "50%", "60%", "70%", "75%", "80%" }
+
+local voucher_keys = {
+  "None",
+  "Overstock",
+  "Clearance Sale",
+  "Hone",
+  "Reroll Surplus",
+  "Crystal Ball",
+  "Telescope",
+  "Grabber",
+  "Wasteful",
+  "Tarot Merchant",
+  "Planet Merchant",
+  "Seed Money",
+  "Blank",
+  "Magic Trick",
+  "Hieroglyph",
+  "Director's Cut",
+  "Paint Brush",
+}
+
 local tag_keys = {
   "None",
   "Charm Tag",
@@ -98,6 +148,12 @@ local pack_keys = {
   "Mega Spectral",
 }
 
+G.FUNCS.change_target_voucher = function(x)
+  Brainstorm.config.ar_filters.voucher_id = x.to_key
+  Brainstorm.config.ar_filters.voucher_name = voucher_list[x.to_val]
+  Brainstorm.writeConfig()
+end
+
 G.FUNCS.change_target_pack = function(x)
   Brainstorm.config.ar_filters.pack_id = x.to_key
   Brainstorm.config.ar_filters.pack = pack_list[x.to_val]
@@ -121,6 +177,17 @@ G.FUNCS.change_spf = function(x)
   Brainstorm.writeConfig()
 end
 
+G.FUNCS.change_face_count = function(x)
+	Brainstorm.config.ar_prefs.face_count = x.to_val
+	Brainstorm.writeConfig()
+end
+
+G.FUNCS.change_suit_ratio = function(x)
+	Brainstorm.config.ar_prefs.suit_ratio_percent = x.to_key
+  Brainstorm.config.ar_prefs.suit_ratio_decimal = ratio_list[x.to_val]
+	Brainstorm.writeConfig()
+end
+
 Brainstorm.opt_ref = G.FUNCS.options
 G.FUNCS.options = function(e)
   Brainstorm.opt_ref(e)
@@ -140,38 +207,99 @@ function create_tabs(args)
             colour = G.C.CLEAR,
           },
           nodes = {
-            create_option_cycle({
-              label = "AR TAG SEARCH",
-              scale = 0.8,
-              w = 4,
-              options = tag_keys,
-              opt_callback = "change_target_tag",
-              current_option = Brainstorm.config.ar_filters.tag_id or 1,
-            }),
-            create_option_cycle({
-              label = "AR PACK SEARCH",
-              scale = 0.8,
-              w = 4,
-              options = pack_keys,
-              opt_callback = "change_target_pack",
-              current_option = Brainstorm.config.ar_filters.pack_id or 1,
-            }),
-            create_option_cycle({
-              label = "AR N. SOULS",
-              scale = 0.8,
-              w = 4,
-              options = { 0, 1 },
-              opt_callback = "change_soul_count",
-              current_option = Brainstorm.config.ar_filters.soul_skip + 1 or 1,
-            }),
-            create_option_cycle({
-              label = "Rerolls per Frame",
-              scale = 0.8,
-              w = 4,
-              options = spf_keys,
-              opt_callback = "change_spf",
-              current_option = Brainstorm.config.ar_prefs.spf_id or 1,
-            }),
+            {
+              n = G.UIT.C,
+              config = {
+                align = "cm",
+                padding = 0.05,
+                r = 0.1,
+                colour = darken(G.C.UI.TRANSPARENT_DARK, 0.25),
+              },
+              nodes = {
+                create_option_cycle({
+                  label = "AR: TAG SEARCH",
+                  scale = 0.8,
+                  w = 4,
+                  options = tag_keys,
+                  opt_callback = "change_target_tag",
+                  current_option = Brainstorm.config.ar_filters.tag_id or 1,
+                }),
+                create_option_cycle({
+                  label = "AR: VOUCHER SEARCH",
+                  scale = 0.8,
+                  w = 4,
+                  options = voucher_keys,
+                  opt_callback = "change_target_voucher",
+                  current_option = Brainstorm.config.ar_filters.voucher_id or 1,
+                }),
+                create_option_cycle({
+                  label = "AR: PACK SEARCH",
+                  scale = 0.8,
+                  w = 4,
+                  options = pack_keys,
+                  opt_callback = "change_target_pack",
+                  current_option = Brainstorm.config.ar_filters.pack_id or 1,
+                }),
+                create_option_cycle({
+                  label = "AR: N. SOULS",
+                  scale = 0.8,
+                  w = 4,
+                  options = { 0, 1 },
+                  opt_callback = "change_soul_count",
+                  current_option = Brainstorm.config.ar_filters.soul_skip + 1
+                    or 1,
+                }),
+              },
+            },
+            {
+              n = G.UIT.C,
+              config = {
+                align = "cm",
+                padding = 0.05,
+                r = 0.1,
+                colour = darken(G.C.UI.TRANSPARENT_DARK, 0.25),
+              },
+              nodes = {
+                create_option_cycle({
+                  label = "AP: Seeds per frame",
+                  scale = 0.8,
+                  w = 4,
+                  options = spf_keys,
+                  opt_callback = "change_spf",
+                  current_option = Brainstorm.config.ar_prefs.spf_id or 1,
+                }),
+                create_toggle({
+                  label = "AR: INST OBSERVATORY",
+                  scale = 0.8,
+                  ref_table = Brainstorm.config.ar_filters,
+                  ref_value = "inst_observatory",
+                  callback = function(_set_toggle) end,
+                }),
+                create_toggle({
+                  label = "AR: INST PERKEO",
+                  scale = 0.8,
+                  ref_table = Brainstorm.config.ar_filters,
+                  ref_value = "inst_perkeo",
+                  callback = function(_set_toggle) end,
+                }),
+                create_option_cycle({
+                  label = "ED: Min. # of Face Cards",
+                  scale = 0.8,
+                  w = 4,
+                  options = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25},
+                  opt_callback = "change_face_count",
+                  current_option = Brainstorm.config.ar_prefs.face_count + 1 or 1,
+                }),
+                create_option_cycle({
+                  label = "ED: Suit Ratio ",
+                  scale = 0.8,
+                  w = 4,
+                  options = ratio_keys,
+                  opt_callback = "change_suit_ratio",
+                  current_option = Brainstorm.config.ar_prefs.suit_ratio_percent,
+                }),
+              },
+            },
           },
         }
       end,
